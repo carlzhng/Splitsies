@@ -78,7 +78,7 @@
   <!-- ── ADD EXPENSE ── -->
   <section id="tab-add" class="section" aria-label="Add expense">
     <p class="section-title">Add an expense</p>
-    <div class="card">
+    <div class="card" id="addExpenseCard">
       {% if not people %}
         <div class="empty-state">
           <i class="ti ti-users" aria-hidden="true"></i>
@@ -156,7 +156,7 @@
             <div>
               <div class="tx-desc">{{ e.description }}</div>
               <div class="tx-meta">
-                {{ e.created_at.strftime('%b %-d') }} · Paid by {{ e.payer }}
+                {{ e.created_at|friendly_date }} · Paid by {{ e.payer }}
                 <span class="split-badge">{{ e.split_mode }}</span>
               </div>
             </div>
@@ -185,8 +185,24 @@
 
   <!-- ── SETTLE UP ── -->
   <section id="tab-settle" class="section" aria-label="Settle up">
+    <div id="settlePanel">
     {% if balances and expenses %}
-      <p class="section-title">Balances</p>
+      <div class="metric-row" style="margin-bottom:1rem;">
+        <div class="metric">
+          <div class="metric-label">Trip total</div>
+          <div class="metric-val">${{ "%.2f"|format(total) }}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Expenses</div>
+          <div class="metric-val">{{ expenses|length }}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">People</div>
+          <div class="metric-val">{{ people|length }}</div>
+        </div>
+      </div>
+
+      <p class="section-title">Final balances</p>
       <div class="card" style="margin-bottom:1rem;">
         <table class="balance-table" aria-label="Balance summary">
           <thead>
@@ -235,12 +251,19 @@
       </div>
       {% endif %}
 
+      <div class="settle-actions">
+        <button class="btn-primary" onclick="goToDiscord()">
+          <i class="ti ti-brand-discord" aria-hidden="true"></i> Send to Discord
+        </button>
+      </div>
+
     {% else %}
       <div class="empty-state large">
         <i class="ti ti-scale" aria-hidden="true"></i>
         Add some expenses to see who owes what
       </div>
     {% endif %}
+    </div>
   </section>
 
   <!-- ── DISCORD ── -->
@@ -252,11 +275,11 @@
       </div>
       <div class="form-row">
         <label for="dcToken" class="dc-label">Bot token</label>
-        <input type="password" id="dcToken" class="dc-input" placeholder="Paste your bot token">
+        <input type="password" id="dcToken" class="dc-input" placeholder="Paste your bot token" value="{{ discord_token }}">
       </div>
       <div class="form-row">
         <label for="dcChannel" class="dc-label">Channel ID</label>
-        <input type="text" id="dcChannel" class="dc-input" placeholder="Right-click a channel → Copy ID">
+        <input type="text" id="dcChannel" class="dc-input" placeholder="Right-click a channel → Copy ID" value="{{ discord_channel }}">
       </div>
       <button class="btn-discord" onclick="sendToDiscord()">
         <i class="ti ti-send" aria-hidden="true"></i>

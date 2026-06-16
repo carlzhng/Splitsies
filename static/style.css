@@ -405,6 +405,10 @@ input::placeholder { color: var(--text-tertiary); }
   margin-bottom: 1.25rem;
 }
 
+.settle-actions {
+  margin-top: 1.5rem;
+}
+
 .metric {
   background: var(--bg-surface);
   border: 1px solid var(--border);

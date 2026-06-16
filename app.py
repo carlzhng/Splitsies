@@ -71,22 +71,87 @@ def compute_settlements(bal):
             di += 1
     return settlements
 
+
+def get_trip_summary():
+    people = Person.query.order_by(Person.created_at).all()
+    expenses = Expense.query.order_by(Expense.created_at.desc()).all()
+    total = sum(e.amount for e in expenses)
+    balances = compute_balances() if people and expenses else {}
+    settlements = compute_settlements(dict(balances)) if balances else []
+    return {
+        "people": people,
+        "expenses": expenses,
+        "total": round(total, 2),
+        "expense_count": len(expenses),
+        "people_count": len(people),
+        "balances": {k: round(v, 2) for k, v in balances.items()},
+        "settlements": settlements,
+    }
+
+
+def format_summary_message(summary):
+    bal = summary["balances"]
+    settlements = summary["settlements"]
+    total = summary["total"]
+    expense_count = summary["expense_count"]
+
+    lines = [
+        "💸 **Splitsies — Trip Summary**",
+        f"Total spent: **${total:.2f}** across {expense_count} expense(s)",
+        "",
+        "**Final balances:**",
+    ]
+    for person, b in bal.items():
+        if b > 0.005:
+            lines.append(f"• {person} gets back **${b:.2f}**")
+        elif b < -0.005:
+            lines.append(f"• {person} owes **${abs(b):.2f}**")
+        else:
+            lines.append(f"• {person} is settled up ✓")
+
+    if settlements:
+        lines += ["", "**Who pays whom:**"]
+        for s in settlements:
+            lines.append(f"• {s['from']} → {s['to']}: **${s['amount']:.2f}**")
+
+    return "\n".join(lines)
+
+
+@app.template_filter("friendly_date")
+def friendly_date(dt):
+    if not dt:
+        return ""
+    return f"{dt.strftime('%b')} {dt.day}"
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.route("/")
 def index():
-    people = Person.query.order_by(Person.created_at).all()
-    expenses = Expense.query.order_by(Expense.created_at.desc()).all()
-    total = sum(e.amount for e in expenses)
-    bal = compute_balances() if people and expenses else {}
-    settlements = compute_settlements(dict(bal)) if bal else []
+    summary = get_trip_summary()
     return render_template(
         "index.html",
-        people=people,
-        expenses=expenses,
-        total=total,
-        balances=bal,
-        settlements=settlements,
+        people=summary["people"],
+        expenses=summary["expenses"],
+        total=summary["total"],
+        balances=summary["balances"],
+        settlements=summary["settlements"],
+        discord_token=os.getenv("DISCORD_BOT_TOKEN", ""),
+        discord_channel=os.getenv("DISCORD_CHANNEL_ID", ""),
+    )
+
+
+@app.route("/api/summary")
+def api_summary():
+    summary = get_trip_summary()
+    return jsonify(
+        {
+            "total": summary["total"],
+            "expense_count": summary["expense_count"],
+            "people_count": summary["people_count"],
+            "balances": summary["balances"],
+            "settlements": summary["settlements"],
+            "people": [{"id": p.id, "name": p.name} for p in summary["people"]],
+        }
     )
 
 # People
@@ -155,7 +220,7 @@ def add_expense():
             db.session.add(Share(expense_id=expense.id, person=person, amount=float(share_amt)))
 
     db.session.commit()
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "id": expense.id})
 
 @app.route("/expenses/delete/<int:expense_id>", methods=["POST"])
 def delete_expense(expense_id):
@@ -167,41 +232,18 @@ def delete_expense(expense_id):
 # Discord
 @app.route("/discord/send", methods=["POST"])
 def discord_send():
-    data = request.get_json()
-    token = (data.get("token") or "").strip()
-    channel_id = (data.get("channel_id") or "").strip()
+    data = request.get_json() or {}
+    token = (data.get("token") or os.getenv("DISCORD_BOT_TOKEN") or "").strip()
+    channel_id = (data.get("channel_id") or os.getenv("DISCORD_CHANNEL_ID") or "").strip()
 
     if not token or not channel_id:
         return jsonify({"error": "Bot token and channel ID are required"}), 400
 
-    expenses = Expense.query.all()
-    if not expenses:
+    summary = get_trip_summary()
+    if not summary["expense_count"]:
         return jsonify({"error": "No expenses to send yet"}), 400
 
-    bal = compute_balances()
-    settlements = compute_settlements(dict(bal))
-    total = sum(e.amount for e in expenses)
-
-    lines = [
-        "💸 **Splitsies — Trip Summary**",
-        f"Total spent: **${total:.2f}** across {len(expenses)} expense(s)",
-        "",
-        "**Final balances:**",
-    ]
-    for person, b in bal.items():
-        if b > 0.005:
-            lines.append(f"• {person} gets back **${b:.2f}**")
-        elif b < -0.005:
-            lines.append(f"• {person} owes **${abs(b):.2f}**")
-        else:
-            lines.append(f"• {person} is settled up ✓")
-
-    if settlements:
-        lines += ["", "**Who pays whom:**"]
-        for s in settlements:
-            lines.append(f"• {s['from']} → {s['to']}: **${s['amount']:.2f}**")
-
-    message = "\n".join(lines)
+    message = format_summary_message(summary)
 
     try:
         resp = http_requests.post(
