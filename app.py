@@ -8,7 +8,16 @@ from datetime import datetime
 load_dotenv()
 
 app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///splitsies.db"
+
+# ── Production Database Configuration ──────────────────────────────────────────
+# Read Render's DATABASE_URL environment variable, fallback to local SQLite
+database_uri = os.getenv("DATABASE_URL", "sqlite:///splitsies.db")
+
+# Fix for modern SQLAlchemy versions which require "postgresql://" instead of "postgres://"
+if database_uri.startswith("postgres://"):
+    database_uri = database_uri.replace("postgres://", "postgresql://", 1)
+
+app.config["SQLALCHEMY_DATABASE_URI"] = database_uri
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.secret_key = os.getenv("SECRET_KEY", "splitsies-dev-key")
 
@@ -263,9 +272,10 @@ def discord_send():
     except Exception as e:
         return jsonify({"error": f"Network error: {str(e)}"}), 500
 
-# ── Init ──────────────────────────────────────────────────────────────────────
+# ── Production-Safe Table Initialization ──────────────────────────────────────
+# This executes during production startup (e.g., when run via Gunicorn)
+with app.app_context():
+    db.create_all()
 
 if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()
     app.run(debug=True)
