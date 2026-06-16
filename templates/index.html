@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Splitsies</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Logo -->
+  <header class="logo">
+    <div class="logo-icon">
+      <i class="ti ti-receipt-2" aria-hidden="true"></i>
+    </div>
+    <div>
+      <div class="logo-name">Splitsies</div>
+      <div class="logo-tag">Trip expense tracker</div>
+    </div>
+  </header>
+
+  <!-- Toast -->
+  <div id="toast" class="toast" role="alert" aria-live="polite"></div>
+
+  <!-- Tabs -->
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="people" role="tab">People</button>
+    <button class="tab" data-tab="add" role="tab">Add expense</button>
+    <button class="tab" data-tab="log" role="tab">Log
+      {% if expenses %}<span class="badge">{{ expenses|length }}</span>{% endif %}
+    </button>
+    <button class="tab" data-tab="settle" role="tab">Settle up</button>
+    <button class="tab" data-tab="discord" role="tab">Discord</button>
+  </nav>
+
+  <!-- ── PEOPLE ── -->
+  <section id="tab-people" class="section active" aria-label="People">
+    <p class="section-title">Who's on this trip?</p>
+    <div class="card">
+      <div class="form-row">
+        <label for="personName">Add a person</label>
+        <div class="input-row">
+          <input type="text" id="personName" placeholder="Name" autocomplete="off" maxlength="60">
+          <button class="btn-primary" onclick="addPerson()">
+            <i class="ti ti-plus" aria-hidden="true"></i> Add
+          </button>
+        </div>
+      </div>
+
+      <div id="peopleList" class="person-list">
+        {% if people %}
+          {% for p in people %}
+          <div class="person-item" id="person-{{ p.id }}">
+            <div class="person-info">
+              <div class="avatar">{{ p.name[0]|upper }}</div>
+              <span>{{ p.name }}</span>
+            </div>
+            <button class="btn-icon btn-danger" onclick="deletePerson({{ p.id }}, this)" aria-label="Remove {{ p.name }}">
+              <i class="ti ti-trash" aria-hidden="true"></i>
+            </button>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="empty-state" id="peoplePlaceholder">
+            <i class="ti ti-users" aria-hidden="true"></i>
+            No one added yet — start by adding your travel crew
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
+  <!-- ── ADD EXPENSE ── -->
+  <section id="tab-add" class="section" aria-label="Add expense">
+    <p class="section-title">Add an expense</p>
+    <div class="card">
+      {% if not people %}
+        <div class="empty-state">
+          <i class="ti ti-users" aria-hidden="true"></i>
+          Add people to the trip first
+        </div>
+      {% else %}
+      <div class="form-row">
+        <label for="expDesc">Description</label>
+        <input type="text" id="expDesc" placeholder="e.g. Dinner at Trattoria" autocomplete="off" maxlength="200">
+      </div>
+      <div class="form-grid">
+        <div class="form-row">
+          <label for="expAmount">Amount ($)</label>
+          <input type="number" id="expAmount" placeholder="0.00" min="0.01" step="0.01">
+        </div>
+        <div class="form-row">
+          <label for="expPayer">Paid by</label>
+          <select id="expPayer">
+            {% for p in people %}
+            <option value="{{ p.name }}">{{ p.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Who was involved?</label>
+        <div class="chip-grid" id="involvedChips">
+          {% for p in people %}
+          <div class="person-chip selected" data-person="{{ p.name }}" onclick="toggleChip(this)" role="checkbox" aria-checked="true" tabindex="0">
+            <div class="avatar sm">{{ p.name[0]|upper }}</div>
+            {{ p.name }}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="form-row">
+        <label>How was it split?</label>
+        <div class="split-toggle">
+          <button class="split-opt active" onclick="setSplit('equal', this)">Equally</button>
+          <button class="split-opt" onclick="setSplit('custom', this)">Custom amounts</button>
+        </div>
+        <div id="customSplit" class="custom-split"></div>
+      </div>
+      <button class="btn-primary" onclick="addExpense()">
+        <i class="ti ti-check" aria-hidden="true"></i> Save expense
+      </button>
+      {% endif %}
+    </div>
+  </section>
+
+  <!-- ── LOG ── -->
+  <section id="tab-log" class="section" aria-label="Expense log">
+    {% if expenses %}
+    <div class="metric-row">
+      <div class="metric">
+        <div class="metric-label">Total spent</div>
+        <div class="metric-val">${{ "%.2f"|format(total) }}</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Expenses</div>
+        <div class="metric-val">{{ expenses|length }}</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">People</div>
+        <div class="metric-val">{{ people|length }}</div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div id="txList" class="tx-list">
+      {% if expenses %}
+        {% for e in expenses %}
+        <div class="tx-item" id="expense-{{ e.id }}">
+          <div class="tx-header">
+            <div>
+              <div class="tx-desc">{{ e.description }}</div>
+              <div class="tx-meta">
+                {{ e.created_at.strftime('%b %-d') }} · Paid by {{ e.payer }}
+                <span class="split-badge">{{ e.split_mode }}</span>
+              </div>
+            </div>
+            <div class="tx-right">
+              <span class="tx-amount">${{ "%.2f"|format(e.amount) }}</span>
+              <button class="btn-icon btn-danger" onclick="deleteExpense({{ e.id }}, this)" aria-label="Delete {{ e.description }}">
+                <i class="ti ti-trash" aria-hidden="true"></i>
+              </button>
+            </div>
+          </div>
+          <div class="tx-chips">
+            {% for s in e.shares %}
+            <span class="tx-chip">{{ s.person }}: ${{ "%.2f"|format(s.amount) }}</span>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty-state">
+          <i class="ti ti-receipt" aria-hidden="true"></i>
+          No expenses yet — add one to get started
+        </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <!-- ── SETTLE UP ── -->
+  <section id="tab-settle" class="section" aria-label="Settle up">
+    {% if balances and expenses %}
+      <p class="section-title">Balances</p>
+      <div class="card" style="margin-bottom:1rem;">
+        <table class="balance-table" aria-label="Balance summary">
+          <thead>
+            <tr>
+              <th>Person</th>
+              <th>Net balance</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for person, b in balances.items() %}
+            <tr>
+              <td>
+                <div class="person-info">
+                  <div class="avatar sm">{{ person[0]|upper }}</div>
+                  {{ person }}
+                </div>
+              </td>
+              <td>
+                {% if b > 0.005 %}
+                  <span class="balance-gets">gets back ${{ "%.2f"|format(b) }}</span>
+                {% elif b < -0.005 %}
+                  <span class="balance-owes">owes ${{ "%.2f"|format(b|abs) }}</span>
+                {% else %}
+                  <span class="balance-settled">settled up ✓</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if settlements %}
+      <p class="section-title">Who pays whom</p>
+      <div class="settlement-list">
+        {% for s in settlements %}
+        <div class="settlement-item">
+          <div class="avatar sm">{{ s.from[0]|upper }}</div>
+          <span class="s-from">{{ s.from }}</span>
+          <i class="ti ti-arrow-right arrow" aria-hidden="true"></i>
+          <span class="s-to">{{ s.to }}</span>
+          <div class="avatar sm">{{ s.to[0]|upper }}</div>
+          <span class="s-amt">${{ "%.2f"|format(s.amount) }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+    {% else %}
+      <div class="empty-state large">
+        <i class="ti ti-scale" aria-hidden="true"></i>
+        Add some expenses to see who owes what
+      </div>
+    {% endif %}
+  </section>
+
+  <!-- ── DISCORD ── -->
+  <section id="tab-discord" class="section" aria-label="Discord">
+    <div class="discord-card">
+      <div class="dc-title">
+        <i class="ti ti-brand-discord" aria-hidden="true"></i>
+        Discord bot
+      </div>
+      <div class="form-row">
+        <label for="dcToken" class="dc-label">Bot token</label>
+        <input type="password" id="dcToken" class="dc-input" placeholder="Paste your bot token">
+      </div>
+      <div class="form-row">
+        <label for="dcChannel" class="dc-label">Channel ID</label>
+        <input type="text" id="dcChannel" class="dc-input" placeholder="Right-click a channel → Copy ID">
+      </div>
+      <button class="btn-discord" onclick="sendToDiscord()">
+        <i class="ti ti-send" aria-hidden="true"></i>
+        Send final balances to Discord
+      </button>
+      <div id="discordStatus" class="dc-status"></div>
+    </div>
+
+    <div class="card setup-guide">
+      <p class="guide-title"><i class="ti ti-info-circle" aria-hidden="true"></i> Setup guide</p>
+      <ol>
+        <li>Go to <a href="https://discord.com/developers/applications" target="_blank" rel="noopener">discord.com/developers/applications</a></li>
+        <li>Create a new application → Bot → Reset Token → copy it above</li>
+        <li>Under Privileged Intents, enable <strong>Message Content Intent</strong></li>
+        <li>Invite the bot to your server with <strong>Send Messages</strong> permission</li>
+        <li>In Discord, enable Developer Mode (Settings → Advanced), then right-click your channel → Copy Channel ID</li>
+      </ol>
+    </div>
+  </section>
+
+</div>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
