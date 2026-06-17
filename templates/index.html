@@ -19,8 +19,8 @@
       <i class="ti ti-receipt-2" aria-hidden="true"></i>
     </div>
     <div>
-      <div class="logo-name">Splitsies</div>
-      <div class="logo-tag">Trip expense tracker</div>
+      <div class="logo-name">Splitsies!!</div>
+      <div class="logo-tag">Trip expense tracker for my bahcuhs</div>
     </div>
   </header>
 
@@ -34,7 +34,7 @@
     <button class="tab" data-tab="log" role="tab">Log
       {% if expenses %}<span class="badge">{{ expenses|length }}</span>{% endif %}
     </button>
-    <button class="tab" data-tab="settle" role="tab">Settle up</button>
+    <button class="tab" data-tab="settle" role="tab">Pay up</button>
     <button class="tab" data-tab="discord" role="tab">Discord</button>
   </nav>
 
@@ -43,7 +43,7 @@
     <p class="section-title">Who's on this trip?</p>
     <div class="card">
       <div class="form-row">
-        <label for="personName">Add a person</label>
+        <label for="personName">Add a chud</label>
         <div class="input-row">
           <input type="text" id="personName" placeholder="Name" autocomplete="off" maxlength="60">
           <button class="btn-primary" onclick="addPerson()">
@@ -68,7 +68,7 @@
         {% else %}
           <div class="empty-state" id="peoplePlaceholder">
             <i class="ti ti-users" aria-hidden="true"></i>
-            No one added yet — start by adding your travel crew
+            No Chuds found yet - Start by adding a fat one
           </div>
         {% endif %}
       </div>
@@ -297,6 +297,16 @@
         <li>Invite the bot to your server with <strong>Send Messages</strong> permission</li>
         <li>In Discord, enable Developer Mode (Settings → Advanced), then right-click your channel → Copy Channel ID</li>
       </ol>
+    </div>
+  </section>
+
+  <!-- ── Splitise image preview ── -->
+  <section class="section image-preview" aria-label="Splitise image">
+    <div class="card image-card">
+      <p class="section-title">Splitise image</p>
+      <div class="image-wrapper">
+        <img src="{{ url_for('static', filename='Splitsies.png') }}" alt="Splitise image">
+      </div>
     </div>
   </section>
 
